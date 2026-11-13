@@ -1,0 +1,48 @@
+name: Build installer
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version number, for example 1.0.0"
+        required: true
+        default: "1.0.0"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build SimonFlow.exe
+        shell: cmd
+        run: |
+          set "FW=%WINDIR%\Microsoft.NET\Framework64\v4.0.30319"
+          set "GAC=%WINDIR%\Microsoft.NET\assembly\GAC_MSIL"
+          "%FW%\csc.exe" /nologo /nowarn:1668 /codepage:65001 /target:winexe /optimize+ /out:SimonFlow.exe /win32icon:AppIcon.ico /lib:"%FW%" /lib:"%FW%\WPF" /lib:"%GAC%\System.Speech\v4.0_4.0.0.0__31bf3856ad364e35" /lib:"%GAC%\System.Web.Extensions\v4.0_4.0.0.0__31bf3856ad364e35" /lib:"%GAC%\System.Net.Http\v4.0_4.0.0.0__b03f5f7f11d50a3a" /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Net.Http.dll /r:System.Web.Extensions.dll /r:System.Speech.dll SimonFlow.cs
+
+      - name: Make sure Inno Setup is installed
+        shell: cmd
+        run: if not exist "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" choco install innosetup --no-progress -y
+
+      - name: Build the installer
+        shell: cmd
+        run: |
+          "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" /DMyAppVersion=${{ inputs.version }} installer\SimonFlow.iss
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: Simon Flow ${{ inputs.version }}
+          make_latest: true
+          files: installer/Output/SimonFlow-Setup.exe
+          body: |
+            **Download `SimonFlow-Setup.exe` below and run it.**
+
+            The installer sets up Simon Flow, downloads the speech engine (about 150 MB), and adds Start menu and desktop shortcuts.
+
+            Windows may say "Windows protected your PC" because the app isn't signed yet. Click **More info**, then **Run anyway**.
